@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "LIGMA"
+version = "1.0.0"
+id = "artifacts/ligma"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21845
+
+[services.development]
+run = "pnpm --filter @workspace/ligma run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ligma", "run", "build" ]
+publicDir = "artifacts/ligma/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21845"
+BASE_PATH = "/"
