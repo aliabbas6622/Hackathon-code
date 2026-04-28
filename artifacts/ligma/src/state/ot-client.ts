@@ -190,8 +190,29 @@ export class OTClient {
         // Server confirmed role change (pushed by admin).
         break;
 
+      case 'cursor':
+        if (msg.userId && msg.userId !== this.userId) {
+          this.awarenessStates.set(msg.userId, msg);
+          for (const l of this.awarenessListeners) l(this.awarenessStates);
+        }
+        break;
+
+      case 'cursor_leave':
+        if (msg.userId) {
+          this.awarenessStates.delete(msg.userId);
+          for (const l of this.awarenessListeners) l(this.awarenessStates);
+        }
+        break;
+
+      case 'peer_joined':
+        if (msg.userId && msg.userId !== this.userId) {
+          this.awarenessStates.set(msg.userId, { userId: msg.userId, userName: msg.userName, color: msg.color, x: 0, y: 0 });
+          for (const l of this.awarenessListeners) l(this.awarenessStates);
+        }
+        break;
+
+      // Legacy awareness (no-op now)
       case 'awareness_update':
-        this.handleAwarenessUpdate(msg.update);
         break;
 
       case 'tasks_changed':
@@ -331,21 +352,7 @@ export class OTClient {
   // ── Awareness (cursor presence) ───────────────────────────────────────────
 
   updateCursor(x: number, y: number): void {
-    this.rawSend({
-      type: 'awareness_update',
-      update: [{ userId: this.userId, userName: this.userName, color: this.color, x, y }],
-    });
-  }
-
-  private handleAwarenessUpdate(update: any): void {
-    if (Array.isArray(update)) {
-      for (const s of update) {
-        if (s.userId && s.userId !== this.userId) {
-          this.awarenessStates.set(s.userId, s);
-        }
-      }
-      for (const l of this.awarenessListeners) l(this.awarenessStates);
-    }
+    this.rawSend({ type: 'cursor', x, y });
   }
 
   getCursorStates(): Map<string, any> {

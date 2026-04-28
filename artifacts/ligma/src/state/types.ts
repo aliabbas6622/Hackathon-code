@@ -1,6 +1,6 @@
 export type Role = 'Lead' | 'Contributor' | 'Viewer';
 export type IntentType = 'action_item' | 'decision' | 'open_question' | 'reference';
-export type NodeKind = 'sticky' | 'rect' | 'text' | 'draw';
+export type NodeKind = 'sticky' | 'rect' | 'text' | 'draw' | 'edge';
 
 export interface CanvasNode {
   id: string;
@@ -11,7 +11,9 @@ export interface CanvasNode {
   h: number;
   color: string;
   text: string;
-  points?: Array<[number, number]>;
+  points?: Array<[number, number]>;  // for draw nodes (world-space)
+  srcId?: string;                     // for edge nodes
+  dstId?: string;                     // for edge nodes
   ownerId?: string | null;
   lockedToRole?: string | null;
   intent?: IntentType | null;
@@ -79,3 +81,6 @@ export interface Task {
   author_name?: string;
   author_color?: string;
 }
+
+// Heatmap data: node_id → edit count
+export type HeatmapData = Map<string, number>;
