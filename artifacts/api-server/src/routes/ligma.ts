@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '@workspace/db';
 import { classifyByAI, classifyByKeyword } from '../classify.js';
+import { generateSummary } from '../summary.js';
 import { getRoom } from '../sessionRoom.js';
 import type { Role } from '../rbac.js';
 
@@ -152,6 +153,17 @@ router.post('/classify', async (req, res) => {
   }
   const result = await classifyByAI(String(text));
   res.json(result);
+});
+
+// ── AI Summary Export ─────────────────────────────────────────────────────────
+
+router.get('/summary/:sessionId', async (req, res) => {
+  try {
+    const summary = await generateSummary(req.params['sessionId']!);
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate summary' });
+  }
 });
 
 // ── Room snapshot (for debugging/REST consumers) ──────────────────────────────

@@ -11,6 +11,140 @@ import ReplayBar from './components/ReplayBar';
 const SWATCHES = ['#5b6af7','#e05050','#31a76c','#d4880a','#2c8fd4','#a855f7','#ec4899'];
 const DEFAULT_SESSION = '00000000-0000-0000-0000-000000000001';
 
+// ── Summary modal ────────────────────────────────────────────────────────────
+interface SummaryItem { text: string; author?: string; nodeId: string; timestamp: string }
+interface SummarySection { title: string; items: SummaryItem[] }
+interface SessionSummary {
+  sessionName: string; generatedAt: string; totalNodes: number; totalEvents: number;
+  sections: { decisions: SummarySection; action_items: SummarySection; open_questions: SummarySection; references: SummarySection };
+  aiNarrative: string | null; source: 'ai' | 'structured';
+}
+
+function toMarkdown(s: SessionSummary): string {
+  const date = new Date(s.generatedAt).toLocaleString();
+  const lines: string[] = [
+    `# LIGMA Session Brief — ${s.sessionName}`,
+    `_Generated ${date} · ${s.totalEvents} events · ${s.source === 'ai' ? 'Gemini 2.0 Flash' : 'structured'}_`,
+    '',
+  ];
+  if (s.aiNarrative) {
+    lines.push('## Executive Summary', '', s.aiNarrative, '');
+  }
+  for (const [key, sec] of Object.entries(s.sections) as [string, SummarySection][]) {
+    if (!sec.items.length) continue;
+    lines.push(`## ${sec.title}`, '');
+    for (const item of sec.items) {
+      const by = item.author ? ` _(${item.author})_` : '';
+      lines.push(`- ${item.text}${by}`);
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+function SummaryModal({ onClose }: { onClose: () => void }) {
+  const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.summary.get(DEFAULT_SESSION)
+      .then((s) => { setSummary(s); setLoading(false); })
+      .catch(() => { setErr('Failed to generate summary'); setLoading(false); });
+  }, []);
+
+  const download = () => {
+    if (!summary) return;
+    const md = toMarkdown(summary);
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `ligma-brief-${Date.now()}.md`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="overlay" onClick={onClose} style={{ zIndex: 2000 }}>
+      <div className="dialog" style={{ width: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', animation: 'pop-in .2s ease' }}
+        onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <div className="dialog-logo" style={{ fontSize: 22, margin: 0 }}>📄 Session Brief</div>
+          <div style={{ flex: 1 }} />
+          {summary && (
+            <button className="btn-join" style={{ width: 'auto', padding: '8px 16px', marginTop: 0, fontSize: 13 }} onClick={download}>
+              ⬇ Download .md
+            </button>
+          )}
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-sub)' }}>✕</button>
+        </div>
+
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-sub)' }}>
+            <div style={{ fontSize: 32, marginBottom: 12, animation: 'pulse 1s infinite' }}>✦</div>
+            Gemini 2.0 Flash is generating your brief…
+          </div>
+        )}
+        {err && <div style={{ color: 'var(--danger)', textAlign: 'center', padding: 24 }}>{err}</div>}
+
+        {summary && (
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 14 }}>
+              {new Date(summary.generatedAt).toLocaleString()} · {summary.totalEvents} events ·
+              <span style={{ marginLeft: 4, color: summary.source === 'ai' ? 'var(--accent)' : 'var(--text-sub)', fontWeight: 600 }}>
+                {summary.source === 'ai' ? '✦ Gemini 2.0 Flash' : 'Structured (no API key)'}
+              </span>
+            </div>
+
+            {summary.aiNarrative && (
+              <div style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent-bg2)', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+                  ✦ Executive Summary
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>{summary.aiNarrative}</div>
+              </div>
+            )}
+
+            {([
+              ['decisions',      '✅', '#1f9060'],
+              ['action_items',   '📋', '#c94040'],
+              ['open_questions', '❓', '#a86800'],
+              ['references',     '📎', '#1a6fa8'],
+            ] as [keyof typeof summary.sections, string, string][]).map(([key, icon, color]) => {
+              const sec = summary.sections[key];
+              if (!sec.items.length) return null;
+              return (
+                <div key={key} style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {icon} {sec.title} <span style={{ fontWeight: 400, color: 'var(--text-sub)' }}>({sec.items.length})</span>
+                  </div>
+                  {sec.items.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ width: 4, background: color, borderRadius: 2, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13 }}>{item.text}</div>
+                        {item.author && (
+                          <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 2 }}>👤 {item.author}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+
+            {!summary.aiNarrative && !Object.values(summary.sections).some((s) => s.items.length) && (
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                No content yet — add sticky notes to the canvas to generate a brief.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface JoinInfo { name: string; role: Role; color: string; userId: string }
 
 // ── Join Dialog ──────────────────────────────────────────────────────────────
@@ -98,6 +232,7 @@ export default function App() {
   const [sideTab,  setSideTab]  = useState<'tasks'|'events'|'users'>('tasks');
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   const denialTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -202,6 +337,14 @@ export default function App() {
         <div className="header-divider" />
         <span className="header-session">Main Brainstorm</span>
         <div className="header-spacer" />
+
+        {/* AI Summary Export */}
+        <button
+          className="tool-btn"
+          title="Export AI Session Brief"
+          style={{ color: 'var(--accent)', fontWeight: 700 }}
+          onClick={() => setShowSummary(true)}
+        >📄</button>
 
         {/* Heatmap toggle */}
         <button
@@ -316,6 +459,9 @@ export default function App() {
 
       {/* Replay bar */}
       <ReplayBar events={events} replaySeq={replaySeq} onSeek={handleSeek} />
+
+      {/* Summary modal */}
+      {showSummary && <SummaryModal onClose={() => setShowSummary(false)} />}
 
       {/* Denial toast */}
       {denial && <div className="denial-toast">⛔ {denial}</div>}

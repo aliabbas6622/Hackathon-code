@@ -116,7 +116,7 @@ Regex patterns match common signals:
 
 Result broadcast immediately so the Task Board updates within ~100ms.
 
-**Phase 2 — Gemini 1.5 Flash (async, if `GEMINI_API_KEY` is set):**
+**Phase 2 — Gemini 2.0 Flash (async, if `GEMINI_API_KEY` is set):**
 Sends a zero-temperature prompt asking for a single-word classification. Overwrites the keyword result if the AI returns a valid intent type. Marks `confirmed_by_ai = true` on the task row.
 
 Tasks are upserted (not duplicated) per `node_id` — edits to the same node update the existing task in place.
@@ -157,6 +157,18 @@ CREATE TABLE events (
 ## Bonus Feature — Presence Heatmap
 
 The heatmap overlay (`HeatmapOverlay.tsx`) renders radial gradients over the canvas at positions of heavily-edited nodes. Edit count is derived from the append-only event log — no extra storage required. Toggle via the 🔥 button in the header.
+
+---
+
+## Bonus Feature — AI Summary Export
+
+The 📄 button in the header calls `GET /api/summary/:sessionId` which:
+1. Queries all classified tasks from the database, grouped by intent type.
+2. If `GEMINI_API_KEY` is set, sends all items to **Gemini 2.0 Flash** with a structured prompt asking for a 3–5 sentence executive narrative.
+3. Returns a JSON payload with `{ sections, aiNarrative, source }`.
+4. The client renders it as a formatted brief and offers a one-click **⬇ Download .md** that produces a clean Markdown file with the executive summary, decision list, action items, open questions, and references.
+
+Falls back gracefully to the structured-only view if no API key is configured.
 
 ---
 

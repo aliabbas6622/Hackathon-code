@@ -36,4 +36,9 @@ export const api = {
     text: (text: string) =>
       axios.post(`${BASE}/classify`, { text }).then((r) => r.data),
   },
+
+  summary: {
+    get: (sessionId: string) =>
+      axios.get(`${BASE}/summary/${sessionId}`).then((r) => r.data),
+  },
 };
