@@ -21,17 +21,22 @@ export interface EventRow {
 
 export async function logEvent(params: LogEventParams): Promise<EventRow> {
   const { sessionId, eventType, nodeId, userId, payload } = params;
-  const result = await pool.query<EventRow>(
-    `INSERT INTO events (session_id, event_type, node_id, user_id, payload)
-     VALUES ($1, $2, $3, $4, $5::jsonb)
-     RETURNING *`,
-    [
-      sessionId,
-      eventType,
-      nodeId ?? null,
-      userId ?? null,
-      payload ? JSON.stringify(payload) : null,
-    ]
-  );
-  return result.rows[0];
+  try {
+    const result = await pool.query<EventRow>(
+      `INSERT INTO events (session_id, event_type, node_id, user_id, payload)
+       VALUES ($1, $2, $3, $4, $5::jsonb)
+       RETURNING *`,
+      [
+        sessionId,
+        eventType,
+        nodeId ?? null,
+        userId ?? null,
+        payload ? JSON.stringify(payload) : null,
+      ]
+    );
+    return result.rows[0]!;
+  } catch (err) {
+    console.error('[logEvent] Critical Database Error:', err);
+    throw err;
+  }
 }

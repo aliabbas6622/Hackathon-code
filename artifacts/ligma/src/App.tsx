@@ -7,6 +7,21 @@ import Canvas from './components/Canvas';
 import TaskBoard from './components/TaskBoard';
 import EventLog from './components/EventLog';
 import ReplayBar from './components/ReplayBar';
+import {
+  Brain,
+  ClipboardList,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  FileText,
+  Activity,
+  History,
+  Lock,
+  Settings,
+  X
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const SWATCHES = ['#5b6af7','#e05050','#31a76c','#d4880a','#2c8fd4','#a855f7','#ec4899'];
 const DEFAULT_SESSION = '00000000-0000-0000-0000-000000000001';
@@ -65,7 +80,7 @@ function SummaryModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="overlay" onClick={onClose} style={{ zIndex: 2000 }}>
-      <div className="dialog" style={{ width: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', animation: 'pop-in .2s ease' }}
+      <div className="dialog" style={{ width: 'min(560px, 95vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', animation: 'pop-in .2s ease' }}
         onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
           <div className="dialog-logo" style={{ fontSize: 22, margin: 0 }}>📄 Session Brief</div>
@@ -230,6 +245,7 @@ export default function App() {
 
   const [denial,   setDenial]   = useState<string | null>(null);
   const [sideTab,  setSideTab]  = useState<'tasks'|'events'|'users'>('tasks');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -344,7 +360,9 @@ export default function App() {
           title="Export AI Session Brief"
           style={{ color: 'var(--accent)', fontWeight: 700 }}
           onClick={() => setShowSummary(true)}
-        >📄</button>
+        >
+          <FileText size={18} />
+        </button>
 
         {/* Heatmap toggle */}
         <button
@@ -352,7 +370,9 @@ export default function App() {
           title={showHeatmap ? 'Hide heatmap' : 'Show presence heatmap'}
           style={showHeatmap ? { background: 'rgba(249,115,22,.1)', color: '#f97316', borderColor: '#f97316' } : {}}
           onClick={() => setShowHeatmap((v) => !v)}
-        >🔥</button>
+        >
+          <Flame size={18} />
+        </button>
 
         <div className="header-pill">
           <div className={`status-dot ${status}`} />
@@ -381,80 +401,108 @@ export default function App() {
         />
 
         {/* Sidebar */}
-        <aside className="sidebar">
-          <div className="sidebar-tabs">
-            {(['tasks','events','users'] as const).map((t) => (
-              <button key={t} className={`sidebar-tab${sideTab === t ? ' active' : ''}`}
-                onClick={() => setSideTab(t)}>
-                {{ tasks: '🧠 Tasks', events: '📋 Log', users: '👥 Users' }[t]}
-              </button>
-            ))}
-          </div>
-          <div className="sidebar-body">
-            {sideTab === 'tasks' && (
-              <TaskBoard tasks={tasks} onNodeFocus={handleNodeFocus} />
-            )}
-            {sideTab === 'events' && (
-              <EventLog events={events} />
-            )}
-            {sideTab === 'users' && (
-              <div className="user-list">
-                <div className="sidebar-section-title">In this session</div>
-                <div className="user-row">
-                  <div className="user-avatar" style={{ background: joinInfo.color }}>
-                    {joinInfo.name[0]?.toUpperCase()}
-                  </div>
-                  <span className="user-name">{joinInfo.name}
-                    <span style={{ fontSize: 10, color: 'var(--text-sub)', marginLeft: 4 }}>(you)</span>
-                  </span>
-                  <span className={`role-chip ${joinInfo.role}`}>{joinInfo.role}</span>
-                </div>
-                {connectedPeers.map((p: any) => (
-                  <div key={p.userId} className="user-row">
-                    <div className="user-avatar" style={{ background: p.color }}>
-                      {(p.userName?.[0] ?? '?').toUpperCase()}
-                    </div>
-                    <span className="user-name">{p.userName}</span>
-                  </div>
+        <button
+          className="sidebar-toggle"
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          style={{
+            position: 'absolute',
+            right: isSidebarCollapsed ? 12 : 276,
+            top: 64,
+            zIndex: 100,
+            transition: 'right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+        >
+          {isSidebarCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        </button>
+
+        <AnimatePresence>
+          {!isSidebarCollapsed && (
+            <motion.aside
+              className="sidebar"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 288, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            >
+              <div className="sidebar-tabs">
+                {(['tasks','events','users'] as const).map((t) => (
+                  <button key={t} className={`sidebar-tab${sideTab === t ? ' active' : ''}`}
+                    onClick={() => setSideTab(t)}
+                    title={t.charAt(0).toUpperCase() + t.slice(1)}>
+                    {t === 'tasks' && <Brain size={16} />}
+                    {t === 'events' && <ClipboardList size={16} />}
+                    {t === 'users' && <Users size={16} />}
+                  </button>
                 ))}
-
-                {/* OT engine panel */}
-                <div style={{ marginTop: 20, padding: '12px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-sub)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-                    OT Engine
-                  </div>
-                  {[
-                    ['Algorithm', 'OT + LWW'],
-                    ['Revision', `#${revision}`],
-                    ['Concurrency', 'Optimistic'],
-                    ['Conflict', 'Field-level merge'],
-                    ['Broadcast', 'Delta ops only'],
-                    ['Events', `${events.length}`],
-                  ].map(([k, v]) => (
-                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
-                      <span style={{ color: 'var(--text-sub)' }}>{k}</span>
-                      <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{v}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Heatmap toggle */}
-                <button
-                  onClick={() => setShowHeatmap((v) => !v)}
-                  style={{
-                    marginTop: 12, width: '100%', padding: '8px',
-                    background: showHeatmap ? 'rgba(249,115,22,.1)' : 'var(--surface2)',
-                    border: `1px solid ${showHeatmap ? '#f97316' : 'var(--border)'}`,
-                    borderRadius: 8, color: showHeatmap ? '#f97316' : 'var(--text-dim)',
-                    cursor: 'pointer', fontWeight: 600, fontSize: 12,
-                  }}
-                >
-                  🔥 {showHeatmap ? 'Hide' : 'Show'} Presence Heatmap
-                </button>
               </div>
-            )}
-          </div>
-        </aside>
+              <div className="sidebar-body">
+                {sideTab === 'tasks' && (
+                  <TaskBoard tasks={tasks} onNodeFocus={handleNodeFocus} />
+                )}
+                {sideTab === 'events' && (
+                  <EventLog events={events} />
+                )}
+                {sideTab === 'users' && (
+                  <div className="user-list">
+                    <div className="sidebar-section-title">In this session</div>
+                    <div className="user-row">
+                      <div className="user-avatar" style={{ background: joinInfo.color }}>
+                        {joinInfo.name[0]?.toUpperCase()}
+                      </div>
+                      <span className="user-name">{joinInfo.name}
+                        <span style={{ fontSize: 10, color: 'var(--text-sub)', marginLeft: 4 }}>(you)</span>
+                      </span>
+                      <span className={`role-chip ${joinInfo.role}`}>{joinInfo.role}</span>
+                    </div>
+                    {connectedPeers.map((p: any) => (
+                      <div key={p.userId} className="user-row">
+                        <div className="user-avatar" style={{ background: p.color }}>
+                          {(p.userName?.[0] ?? '?').toUpperCase()}
+                        </div>
+                        <span className="user-name">{p.userName}</span>
+                      </div>
+                    ))}
+
+                    {/* OT engine panel */}
+                    <div style={{ marginTop: 20, padding: '12px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-sub)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Activity size={12} /> OT Engine
+                      </div>
+                      {[
+                        ['Algorithm', 'OT + Field-level Merge'],
+                        ['Revision', `#${revision}`],
+                        ['Concurrency', 'Optimistic'],
+                        ['Conflict', 'Field-level merge'],
+                        ['Broadcast', 'Delta ops only'],
+                        ['Events', `${events.length}`],
+                      ].map(([k, v]) => (
+                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
+                          <span style={{ color: 'var(--text-sub)' }}>{k}</span>
+                          <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Heatmap toggle */}
+                    <button
+                      onClick={() => setShowHeatmap((v) => !v)}
+                      style={{
+                        marginTop: 12, width: '100%', padding: '8px',
+                        background: showHeatmap ? 'rgba(249,115,22,.1)' : 'var(--surface2)',
+                        border: `1px solid ${showHeatmap ? '#f97316' : 'var(--border)'}`,
+                        borderRadius: 8, color: showHeatmap ? '#f97316' : 'var(--text-dim)',
+                        cursor: 'pointer', fontWeight: 600, fontSize: 12,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                      }}
+                    >
+                      <Flame size={14} /> {showHeatmap ? 'Hide' : 'Show'} Heatmap
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Replay bar */}

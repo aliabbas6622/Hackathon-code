@@ -1,0 +1,26 @@
+services:
+  # API Server
+  - type: web
+    name: ligma-api
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PORT
+        value: 8080
+
+  # Frontend (Static Site)
+  - type: web
+    name: ligma-frontend
+    env: static
+    plan: free
+    buildCommand: pnpm install && pnpm --filter @workspace/ligma run build
+    staticPublishPath: artifacts/ligma/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://ligma-api.onrender.com # Update this after API deploy

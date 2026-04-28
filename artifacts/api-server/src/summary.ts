@@ -1,4 +1,5 @@
 import { pool } from '@workspace/db';
+import { logger } from './lib/logger.js';
 
 export interface SummarySection {
   title: string;
@@ -77,12 +78,18 @@ async function buildStructured(sessionId: string): Promise<SessionSummary> {
 }
 
 export async function generateSummary(sessionId: string): Promise<SessionSummary> {
-  const structured = await buildStructured(sessionId);
+  let structured: SessionSummary;
+  try {
+    structured = await buildStructured(sessionId);
+  } catch (err) {
+    console.error('DEBUG SUMMARY ERROR:', err);
+    logger.error({ err, sessionId }, 'Error building structured summary data');
+    throw err;
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return structured;
 
-  // Flatten all tasks into a readable prompt
   const allItems = [
     ...structured.sections.decisions.items.map((i) => `[DECISION] ${i.text}`),
     ...structured.sections.action_items.items.map((i) => `[ACTION] ${i.text}${i.author ? ` (owner: ${i.author})` : ''}`),
@@ -123,7 +130,9 @@ Be direct and professional. Do not use bullet points — write in prose.`;
         return { ...structured, aiNarrative: narrative.trim(), source: 'ai' };
       }
     }
-  } catch { /* fall back to structured */ }
+  } catch (err) {
+    logger.error({ err }, 'AI Summary generation failed');
+  }
 
   return structured;
 }

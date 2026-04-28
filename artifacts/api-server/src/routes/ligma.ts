@@ -5,6 +5,7 @@ import { classifyByAI, classifyByKeyword } from '../classify.js';
 import { generateSummary } from '../summary.js';
 import { getRoom } from '../sessionRoom.js';
 import type { Role } from '../rbac.js';
+import { logger } from '../lib/logger.js';
 
 const router = Router();
 
@@ -14,7 +15,8 @@ router.get('/sessions', async (_req, res) => {
   try {
     const r = await pool.query(`SELECT id, name, created_at FROM sessions ORDER BY created_at`);
     res.json(r.rows);
-  } catch {
+  } catch (err) {
+    logger.error({ err }, 'Error in /sessions');
     res.json([{ id: '00000000-0000-0000-0000-000000000001', name: 'Main Brainstorm', created_at: new Date().toISOString() }]);
   }
 });
@@ -100,7 +102,8 @@ router.get('/events/:sessionId', async (req, res) => {
       [req.params['sessionId'], limit],
     );
     res.json(r.rows);
-  } catch {
+  } catch (err) {
+    logger.error({ err, sessionId: req.params['sessionId'] }, 'Error in /events');
     res.json([]);
   }
 });
@@ -120,7 +123,8 @@ router.get('/tasks/:sessionId', async (req, res) => {
       [req.params['sessionId']],
     );
     res.json(r.rows);
-  } catch {
+  } catch (err) {
+    logger.error({ err, sessionId: req.params['sessionId'] }, 'Error in /tasks');
     res.json([]);
   }
 });
@@ -138,7 +142,8 @@ router.get('/replay/:sessionId', async (req, res) => {
       [req.params['sessionId'], seq],
     );
     res.json({ events: r.rows });
-  } catch {
+  } catch (err) {
+    logger.error({ err, sessionId: req.params['sessionId'], seq: req.query['seq'] }, 'Error in /replay');
     res.json({ events: [] });
   }
 });
@@ -162,6 +167,7 @@ router.get('/summary/:sessionId', async (req, res) => {
     const summary = await generateSummary(req.params['sessionId']!);
     res.json(summary);
   } catch (err) {
+    logger.error({ err, sessionId: req.params['sessionId'] }, 'Failed to generate summary');
     res.status(500).json({ error: 'Failed to generate summary' });
   }
 });

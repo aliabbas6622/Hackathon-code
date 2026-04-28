@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run *)",
+      "Bash(where npm *)",
+      "Bash(npx pnpm *)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm *)",
+      "Bash(PORT=3000 pnpm *)",
+      "Bash(PORT=3000 BASE_PATH=/ pnpm *)",
+      "Bash(PORT=3001 BASE_PATH=/ pnpm run dev)",
+      "Bash(PORT=8080 DATABASE_URL=postgres://localhost:5432/workspace pnpm run dev)",
+      "Bash(set NODE_ENV=development)",
+      "Bash(set DATABASE_URL=postgresql://postgres:03377770951@db.tofxgmgifbhwviydsush.supabase.co:5432/postgres)",
+      "Bash(cmd *)",
+      "Bash(env *)",
+      "Bash(netstat -ano)",
+      "Bash(kill 2176 *)",
+      "Bash(PORT=3002 BASE_PATH=/ pnpm run dev)",
+      "Bash(export PORT=3002 BASE_PATH=/)",
+      "Bash(curl -s http://localhost:8080/api/health)",
+      "Bash(curl -s http://localhost:3001/)",
+      "Bash(curl -v http://localhost:3001/)",
+      "Bash(wmic process *)"
+    ]
+  }
+}

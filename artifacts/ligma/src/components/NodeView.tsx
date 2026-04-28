@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { X, Lock, Unlock, Sparkles, Trash2 } from 'lucide-react';
 import type { CanvasNode } from '../state/types';
 
 function intentLabel(intent: string | null | undefined): string {
@@ -32,7 +34,11 @@ function DrawNode({ node, selected, onPointerDown, onDelete, canEdit }: {
   const pts = node.points.map(([x, y]) => `${x - minX},${y - minY}`).join(' ');
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
       className={`canvas-node${selected ? ' selected' : ''}`}
       style={{
         left: node.x, top: node.y, width: node.w, height: node.h,
@@ -48,11 +54,13 @@ function DrawNode({ node, selected, onPointerDown, onDelete, canEdit }: {
       {canEdit && selected && (
         <button
           className="node-action danger"
-          style={{ position: 'absolute', top: -12, right: -12, opacity: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '50%', width: 20, height: 20, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+          style={{ position: 'absolute', top: -12, right: -12, opacity: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '50%', width: 20, height: 20, fontSize: 10, display: 'flex', alignItems: 'center', justifyCenter: 'center', padding: 0 }}
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        >✕</button>
+        >
+          <X size={10} />
+        </button>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -88,8 +96,13 @@ export default function NodeView({ node, selected, canEdit, zoom, onPointerDown,
   const editable = canEdit && !node.lockedToRole;
 
   return (
-    <div
-      className={`canvas-node pop-in${selected ? ' selected' : ''}${node.lockedToRole ? ' locked' : ''}`}
+    <motion.div
+      layoutId={node.id}
+      initial={{ opacity: 0, scale: 0.85, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.7, filter: 'blur(4px)' }}
+      transition={{ type: 'spring', damping: 20, stiffness: 250 }}
+      className={`canvas-node${selected ? ' selected' : ''}${node.lockedToRole ? ' locked' : ''}`}
       style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
       onPointerDown={onPointerDown}
       onContextMenu={onContextMenu}
@@ -102,10 +115,11 @@ export default function NodeView({ node, selected, canEdit, zoom, onPointerDown,
         <div className="node-header">
           {node.intent && (
             <span className={`node-intent-badge ${intentClass}`}>
-              {intentLabel(node.intent)}{node.intentSource === 'ai' ? ' ✦' : ''}
+              {node.intentSource === 'ai' && <Sparkles size={10} style={{ marginRight: 4 }} />}
+              {intentLabel(node.intent)}
             </span>
           )}
-          {node.lockedToRole && <span className="node-lock">🔒 {node.lockedToRole}</span>}
+          {node.lockedToRole && <span className="node-lock"><Lock size={10} style={{ marginRight: 2 }} /> {node.lockedToRole}</span>}
         </div>
       )}
 
@@ -124,7 +138,9 @@ export default function NodeView({ node, selected, canEdit, zoom, onPointerDown,
       {/* footer */}
       <div className="node-footer">
         {editable && (
-          <button className="node-action danger" onClick={(e) => { e.stopPropagation(); onDelete(); }}>✕</button>
+          <button className="node-action danger" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+            <Trash2 size={14} />
+          </button>
         )}
       </div>
 
@@ -132,6 +148,6 @@ export default function NodeView({ node, selected, canEdit, zoom, onPointerDown,
       {editable && (
         <div className="resize-handle" onPointerDown={(e) => { e.stopPropagation(); onResizeStart(e); }} />
       )}
-    </div>
+    </motion.div>
   );
 }

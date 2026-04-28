@@ -2,6 +2,20 @@ import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid';
 import type { CanvasNode, Role, HeatmapData } from '../state/types';
 import type { OTClient } from '../state/ot-client';
+import {
+  MousePointer2,
+  StickyNote,
+  Square,
+  Type,
+  Pencil,
+  Share2,
+  Home,
+  Trash2,
+  Lock,
+  Unlock,
+  Plus
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import NodeView from './NodeView';
 import Cursors from './Cursors';
 import HeatmapOverlay from './HeatmapOverlay';
@@ -117,9 +131,80 @@ export default function Canvas({ client, nodes, role, replayNodes, focusNodeId, 
     return { sx: e.clientX - r.left, sy: e.clientY - r.top };
   }, []);
 
-  // ── Space = pan mode ────────────────────────────────────────────────
+  // ── Keyboard shortcuts & Pan mode ──────────────────────────────────────
+  const doZoomCentered = useCallback((factor: number) => {
+    const el = areaRef.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const sx = width / 2;
+    const sy = height / 2;
+    setZoom((z) => {
+      const nz = Math.min(4, Math.max(0.1, z * factor));
+      setPan((p) => ({
+        x: sx - (sx - p.x) * (nz / z),
+        y: sy - (sy - p.y) * (nz / z),
+      }));
+      return nz;
+    });
+  }, []);
+
+  const handleFitToScreen = useCallback(() => {
+    if (displayNodes.size === 0) {
+      setPan({ x: 0, y: 0 });
+      setZoom(1);
+      return;
+    }
+    const nodesArr = Array.from(displayNodes.values()).filter(n => n.kind !== 'edge');
+    if (nodesArr.length === 0) {
+      setPan({ x: 0, y: 0 });
+      setZoom(1);
+      return;
+    }
+    const minX = Math.min(...nodesArr.map(n => n.x));
+    const minY = Math.min(...nodesArr.map(n => n.y));
+    const maxX = Math.max(...nodesArr.map(n => n.x + n.w));
+    const maxY = Math.max(...nodesArr.map(n => n.y + n.h));
+
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+    
+    const el = areaRef.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    
+    // Calculate required zoom with 40px padding on all sides (80px total)
+    const targetW = width - 80;
+    const targetH = height - 80;
+    
+    const scaleX = targetW / contentW;
+    const scaleY = targetH / contentH;
+    const newZoom = Math.min(4, Math.max(0.1, Math.min(scaleX, scaleY)));
+    
+    // Center the content
+    setZoom(newZoom);
+    setPan({
+      x: width / 2 - (minX + contentW / 2) * newZoom,
+      y: height / 2 - (minY + contentH / 2) * newZoom,
+    });
+  }, [displayNodes]);
+
   useEffect(() => {
-    const kd = (e: KeyboardEvent) => { if (e.code === 'Space') spaceRef.current = true; };
+    const kd = (e: KeyboardEvent) => { 
+      if (e.code === 'Space') spaceRef.current = true; 
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '0') {
+          e.preventDefault();
+          setZoom(1);
+          setPan({ x: 0, y: 0 });
+        } else if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          doZoomCentered(1.1);
+        } else if (e.key === '-') {
+          e.preventDefault();
+          doZoomCentered(0.9);
+        }
+      }
+    };
     const ku = (e: KeyboardEvent) => { if (e.code === 'Space') spaceRef.current = false; };
     const del = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected &&
@@ -128,26 +213,37 @@ export default function Canvas({ client, nodes, role, replayNodes, focusNodeId, 
         setSelected(null);
       }
     };
-    window.addEventListener('keydown', kd);
+    window.addEventListener('keydown', kd, { passive: false });
     window.addEventListener('keyup', ku);
     window.addEventListener('keydown', del);
     return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('keydown', del); };
-  }, [selected, client]);
+  }, [selected, client, doZoomCentered]);
 
-  // ── Wheel → zoom ────────────────────────────────────────────────────
+  // ── Wheel → zoom or pan ──────────────────────────────────────────────
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const { sx, sy } = screenCoords(e);
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom((z) => {
-      const nz = Math.min(3, Math.max(0.2, z * delta));
+    // Determine if user is panning or zooming. Browsers map pinch to ctrlKey=true
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const { sx, sy } = screenCoords(e);
+      // deltaY might be small for pinch, large for wheel
+      const delta = Math.exp(-e.deltaY * 0.01);
+      setZoom((z) => {
+        const nz = Math.min(4, Math.max(0.1, z * delta));
+        setPan((p) => ({
+          x: sx - (sx - p.x) * (nz / z),
+          y: sy - (sy - p.y) * (nz / z),
+        }));
+        return nz;
+      });
+    } else {
+      // Pan with two-finger scroll
       setPan((p) => ({
-        x: sx - (sx - p.x) * (nz / z),
-        y: sy - (sy - p.y) * (nz / z),
+        x: p.x - e.deltaX,
+        y: p.y - e.deltaY,
       }));
-      return nz;
-    });
+    }
   }, [screenCoords]);
+
 
   // ── Canvas pointer down ─────────────────────────────────────────────
   const handleCanvasDown = useCallback((e: React.PointerEvent) => {
@@ -328,13 +424,13 @@ export default function Canvas({ client, nodes, role, replayNodes, focusNodeId, 
     return map;
   }, [cursors, pan, zoom]);
 
-  const toolDefs: Array<{ id: Tool; icon: string; label: string }> = [
-    { id: 'select',  icon: '↖',  label: 'Select (V)' },
-    { id: 'sticky',  icon: '📌', label: 'Sticky (S)' },
-    { id: 'rect',    icon: '▭',  label: 'Rectangle (R)' },
-    { id: 'text',    icon: 'T',  label: 'Text (T)' },
-    { id: 'draw',    icon: '✏️', label: 'Draw (D)' },
-    { id: 'connect', icon: '↔',  label: 'Connect (C)' },
+  const toolDefs: Array<{ id: Tool; icon: React.ReactNode; label: string }> = [
+    { id: 'select',  icon: <MousePointer2 size={16} />,  label: 'Select (V)' },
+    { id: 'sticky',  icon: <StickyNote size={16} />,    label: 'Sticky (S)' },
+    { id: 'rect',    icon: <Square size={16} />,        label: 'Rectangle (R)' },
+    { id: 'text',    icon: <Type size={16} />,          label: 'Text (T)' },
+    { id: 'draw',    icon: <Pencil size={16} />,        label: 'Draw (D)' },
+    { id: 'connect', icon: <Share2 size={16} />,        label: 'Connect (C)' },
   ];
 
   const isReadonly = !!replayNodes;
@@ -374,7 +470,9 @@ export default function Canvas({ client, nodes, role, replayNodes, focusNodeId, 
           <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>
             {zoom !== 1 ? `${Math.round(zoom * 100)}%` : ''} {displayNodes.size} obj
           </span>
-          <button className="tool-btn" title="Reset view" onClick={() => { setPan({ x: 40, y: 40 }); setZoom(1); }}>⌂</button>
+          <button className="tool-btn" title="Fit to screen" onClick={handleFitToScreen}>
+            <Home size={16} />
+          </button>
         </div>
       </div>
 
@@ -399,23 +497,25 @@ export default function Canvas({ client, nodes, role, replayNodes, focusNodeId, 
           <EdgeLayer nodes={displayNodes} />
 
           {/* Nodes */}
-          {Array.from(displayNodes.values())
-            .filter((n) => n.kind !== 'edge')
-            .map((node) => (
-              <NodeView
-                key={node.id}
-                node={node}
-                selected={selected === node.id}
-                canEdit={role !== 'Viewer' && !isReadonly}
-                zoom={zoom}
-                onPointerDown={(e) => handleNodeDown(e, node.id)}
-                onResizeStart={(e) => handleResizeStart(e, node.id)}
-                onTextChange={(text) => client.updateNode(node.id, { text })}
-                onDelete={() => { client.deleteNode(node.id); setSelected(null); }}
-                onLock={(r) => client.lockNode(node.id, r)}
-                onContextMenu={(e) => handleCtxMenu(e, node.id)}
-              />
-            ))}
+          <AnimatePresence>
+            {Array.from(displayNodes.values())
+              .filter((n) => n.kind !== 'edge')
+              .map((node) => (
+                <NodeView
+                  key={node.id}
+                  node={node}
+                  selected={selected === node.id}
+                  canEdit={role !== 'Viewer' && !isReadonly}
+                  zoom={zoom}
+                  onPointerDown={(e) => handleNodeDown(e, node.id)}
+                  onResizeStart={(e) => handleResizeStart(e, node.id)}
+                  onTextChange={(text) => client.updateNode(node.id, { text })}
+                  onDelete={() => { client.deleteNode(node.id); setSelected(null); }}
+                  onLock={(r) => client.lockNode(node.id, r)}
+                  onContextMenu={(e) => handleCtxMenu(e, node.id)}
+                />
+              ))}
+          </AnimatePresence>
         </div>
 
         {/* Heatmap overlay (in screen space — uses pre-transformed coords from component) */}

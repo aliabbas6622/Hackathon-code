@@ -65,7 +65,7 @@ export class SessionRoom {
       eventType: 'user_disconnected',
       userId: conn.userId,
       payload: { userName: conn.userName, role: conn.role },
-    }).catch(() => {});
+    }).catch((err) => { console.error('[SessionRoom] Failed to log user_disconnected:', err); });
   }
 
   // ── Message dispatcher ────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ export class SessionRoom {
           eventType: 'user_connected',
           userId: conn.userId,
           payload: { userName: conn.userName, role: conn.role },
-        }).catch(() => {});
+        }).catch((err) => console.error('logEvent failed:', err));
         // Broadcast this user's presence to existing peers
         this.broadcast({ type: 'peer_joined', userId: conn.userId, userName: conn.userName, color: conn.color, role: conn.role }, conn);
         return;
@@ -156,7 +156,7 @@ export class SessionRoom {
       nodeId: transformed.nodeId,
       userId: conn.userId,
       payload: { ...transformed.payload, revision, opId: transformed.id },
-    }).catch(() => {});
+    }).catch((err) => console.error('logEvent failed:', err));
 
     // Persist node row
     if (transformed.type === 'add_node' || transformed.type === 'lock_node') {
@@ -166,10 +166,10 @@ export class SessionRoom {
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (id) DO UPDATE SET locked_to_role = EXCLUDED.locked_to_role`,
         [transformed.nodeId, this.sessionId, conn.userId, node?.lockedToRole ?? null],
-      ).catch(() => {});
+      ).catch((err) => { console.error('[SessionRoom] Failed to upsert node:', err); });
     }
     if (transformed.type === 'delete_node') {
-      pool.query(`DELETE FROM nodes WHERE id = $1`, [transformed.nodeId]).catch(() => {});
+      pool.query(`DELETE FROM nodes WHERE id = $1`, [transformed.nodeId]).catch((err) => { console.error('[SessionRoom] Failed to delete node:', err); });
     }
 
     // Ack submitter
@@ -183,7 +183,7 @@ export class SessionRoom {
       (transformed.type === 'add_node' || transformed.type === 'update_node') &&
       transformed.payload.text
     ) {
-      this.classifyAndBroadcast(transformed.nodeId, transformed.payload.text, conn.userId).catch(() => {});
+      this.classifyAndBroadcast(transformed.nodeId, transformed.payload.text, conn.userId).catch((err) => { console.error('[SessionRoom] Failed classifyAndBroadcast:', err); });
     }
   }
 
@@ -234,6 +234,9 @@ export class SessionRoom {
       this.send(peer.ws, { type: 'op_broadcast', revision: kwRev, op: kwOp });
     }
     await this.upsertTask(nodeId, userId, text, kw.intent, false);
+    for (const peer of this.conns) {
+      this.send(peer.ws, { type: 'tasks_changed' });
+    }
 
     // Phase 2: Gemini
     const ai = await classifyByAI(text);
@@ -269,7 +272,7 @@ export class SessionRoom {
          SET title = EXCLUDED.title, intent_type = EXCLUDED.intent_type,
              confirmed_by_ai = EXCLUDED.confirmed_by_ai, updated_at = NOW()`,
       [this.sessionId, nodeId, userId, title.slice(0, 500), intentType, confirmedByAi],
-    ).catch(() => {});
+    ).catch((err) => { console.error('[SessionRoom] Failed to upsertTask:', err); });
   }
 
   // ── Admin role push ───────────────────────────────────────────────────────

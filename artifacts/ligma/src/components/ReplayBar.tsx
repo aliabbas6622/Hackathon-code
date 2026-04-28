@@ -1,4 +1,5 @@
 import React from 'react';
+import { Play, X, Rewind, History } from 'lucide-react';
 import type { EventRow } from '../state/types';
 
 interface Props {
@@ -16,7 +17,9 @@ export default function ReplayBar({ events, replaySeq, onSeek }: Props) {
 
   return (
     <div className="replay-bar">
-      <span className="replay-label">⏱ Time Travel</span>
+      <div className="replay-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <History size={14} /> <span className="mobile-hide">Time Travel</span>
+      </div>
       <input
         type="range"
         min={0}
@@ -29,9 +32,10 @@ export default function ReplayBar({ events, replaySeq, onSeek }: Props) {
       </span>
       <button
         className={`replay-btn${isActive ? ' active' : ''}`}
-        onClick={() => onSeek(isActive ? null : max - Math.floor(max / 2))}
+        onClick={() => onSeek(isActive ? null : max)}
       >
-        {isActive ? 'Exit Replay' : 'Replay'}
+        {isActive ? <X size={14} /> : <Play size={14} />}
+        <span className="mobile-hide" style={{ marginLeft: 6 }}>{isActive ? 'Exit' : 'Replay'}</span>
       </button>
     </div>
   );
