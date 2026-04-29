@@ -29,7 +29,7 @@ services:
     runtime: static
     plan: free
     buildCommand: cd frontend && corepack enable && pnpm install --frozen-lockfile && pnpm --filter @ligma/ligma run build
-    staticPublishPath: frontend/ligma/dist/public
+    staticPublishPath: frontend/ligma/dist
     routes:
       - type: rewrite
         source: /*
