@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "installCommand": "cd frontend && pnpm install",
+  "buildCommand": "cd frontend/ligma && pnpm build",
+  "outputDirectory": "frontend/ligma/dist/public",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
