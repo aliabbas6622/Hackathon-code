@@ -78,6 +78,138 @@ function GhostEdge({ from, to }: { from: { x: number; y: number }; to: { x: numb
   );
 }
 
+// ── Minimap ─────────────────────────────────────────────────────────────
+function Minimap({ nodes, pan, zoom, setPan, areaRef }: {
+  nodes: Map<string, CanvasNode>;
+  pan: { x: number; y: number };
+  zoom: number;
+  setPan: (p: { x: number; y: number }) => void;
+  areaRef: React.RefObject<HTMLDivElement>;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const mapWidth = 160;
+  const mapHeight = 120;
+  const padding = 20;
+
+  // Calculate world bounds of all nodes
+  const bounds = useMemo(() => {
+    const arr = Array.from(nodes.values()).filter(n => n.kind !== 'edge');
+    if (arr.length === 0) return { minX: 0, minY: 0, maxX: 1000, maxY: 1000 };
+    const minX = Math.min(...arr.map(n => n.x));
+    const minY = Math.min(...arr.map(n => n.y));
+    const maxX = Math.max(...arr.map(n => n.x + n.w));
+    const maxY = Math.max(...arr.map(n => n.y + n.h));
+    return { minX, minY, maxX, maxY };
+  }, [nodes]);
+
+  // Combine node bounds with current viewport bounds
+  const worldBounds = useMemo(() => {
+    const el = areaRef.current;
+    let vw = 800, vh = 600;
+    if (el) { vw = el.clientWidth / zoom; vh = el.clientHeight / zoom; }
+    
+    const viewMinX = -pan.x / zoom;
+    const viewMinY = -pan.y / zoom;
+    const viewMaxX = viewMinX + vw;
+    const viewMaxY = viewMinY + vh;
+
+    return {
+      minX: Math.min(bounds.minX, viewMinX) - padding,
+      minY: Math.min(bounds.minY, viewMinY) - padding,
+      maxX: Math.max(bounds.maxX, viewMaxX) + padding,
+      maxY: Math.max(bounds.maxY, viewMaxY) + padding,
+    };
+  }, [bounds, pan, zoom, areaRef]);
+
+  const worldW = Math.max(1, worldBounds.maxX - worldBounds.minX);
+  const worldH = Math.max(1, worldBounds.maxY - worldBounds.minY);
+  const scale = Math.min(mapWidth / worldW, mapHeight / worldH);
+  
+  const wX = (x: number) => (x - worldBounds.minX) * scale;
+  const wY = (y: number) => (y - worldBounds.minY) * scale;
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    handlePointerMove(e);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging && e.type !== 'pointerdown') return;
+    e.stopPropagation();
+    const el = e.currentTarget.getBoundingClientRect();
+    const mapX = e.clientX - el.left;
+    const mapY = e.clientY - el.top;
+    
+    const targetWorldX = worldBounds.minX + mapX / scale;
+    const targetWorldY = worldBounds.minY + mapY / scale;
+
+    const area = areaRef.current;
+    if (!area) return;
+    const vw = area.clientWidth / zoom;
+    const vh = area.clientHeight / zoom;
+
+    setPan({
+      x: -(targetWorldX - vw / 2) * zoom,
+      y: -(targetWorldY - vh / 2) * zoom,
+    });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  // Viewport proxy rect
+  let vx = 0, vy = 0, vw = 0, vh = 0;
+  if (areaRef.current) {
+    const aw = areaRef.current.clientWidth;
+    const ah = areaRef.current.clientHeight;
+    vx = wX(-pan.x / zoom);
+    vy = wY(-pan.y / zoom);
+    vw = (aw / zoom) * scale;
+    vh = (ah / zoom) * scale;
+  }
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 16, left: 16,
+      width: mapWidth, height: mapHeight,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      boxShadow: 'var(--shadow-md)',
+      overflow: 'hidden',
+      cursor: isDragging ? 'grabbing' : 'pointer',
+      zIndex: 100
+    }}
+    onPointerDown={handlePointerDown}
+    onPointerMove={handlePointerMove}
+    onPointerUp={handlePointerUp}>
+      {Array.from(nodes.values()).filter(n => n.kind !== 'edge').map(n => (
+        <div key={n.id} style={{
+          position: 'absolute',
+          left: wX(n.x), top: wY(n.y),
+          width: n.w * scale, height: n.h * scale,
+          background: n.color || 'var(--accent)',
+          opacity: 0.8,
+          borderRadius: 2
+        }} />
+      ))}
+      <div style={{
+        position: 'absolute',
+        left: vx, top: vy, width: vw, height: vh,
+        border: '1.5px solid var(--info)',
+        background: 'rgba(59, 130, 246, 0.1)',
+        pointerEvents: 'none',
+      }} />
+    </div>
+  );
+}
+
 export default function Canvas({ client, nodes, role, replayNodes, focusNodeId, heatmap, showHeatmap }: Props) {
   // ── Camera ──────────────────────────────────────────────────────────
   const [pan, setPan]   = useState({ x: 40, y: 40 });
@@ -541,6 +673,9 @@ export default function Canvas({ client, nodes, role, replayNodes, focusNodeId, 
             ⏱ Replay mode — read only
           </div>
         )}
+        
+        {/* Minimap */}
+        <Minimap nodes={displayNodes} pan={pan} zoom={zoom} setPan={setPan} areaRef={areaRef} />
       </div>
 
       {/* Context menu */}
